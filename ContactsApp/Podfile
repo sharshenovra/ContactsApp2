@@ -6,7 +6,7 @@ target 'ContactsApp' do
   use_frameworks!
 
 pod 'SnapKit'
-
+pod 'RealmSwift'
   # Pods for ContactsApp
 
 end

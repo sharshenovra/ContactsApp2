@@ -1,14 +1,17 @@
 import UIKit
 import SnapKit
+import RealmSwift
 
-struct KeysDefaults{
-    static let keyName = "name"
-    static let keyNumber = "number"
+class Contact: Object {
+    @objc dynamic var name = ""
+    @objc dynamic var number = ""
 }
 
-class ViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
+class ViewController: UIViewController {
     
-    let defaults = UserDefaults.standard
+    let realm = try! Realm()
+    
+    var contacts: Results<Contact>!
     
     lazy var tableView: UITableView = {
         let view = UITableView()
@@ -26,6 +29,8 @@ class ViewController: UIViewController, UITableViewDataSource, UITableViewDelega
         navigationItem.rightBarButtonItem = UIBarButtonItem(title: "Add", style: .plain, target: self, action: #selector(addTapped))
         
         setupSubviews()
+        
+        contacts = realm.objects(Contact.self)
         self.tableView.reloadData()
     }
 
@@ -33,46 +38,12 @@ class ViewController: UIViewController, UITableViewDataSource, UITableViewDelega
         super.viewDidAppear(animated)
         self.tableView.reloadData()
     }
-
-    
     
     private func setupSubviews(){
         view.addSubview(tableView)
         tableView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
-    }
-    
-    
-    func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        return UITableView.automaticDimension
-    }
-    
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return DataBase.shared.info.count
-    }
-    
-    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        let rootVC = DetailedVC()
-        let navVC = UINavigationController(rootViewController: rootVC)
-        rootVC.nameField.text = DataBase.shared.info[indexPath.row].name
-        rootVC.numberField.text = DataBase.shared.info[indexPath.row].number
-        rootVC.title = DataBase.shared.info[indexPath.row].name
-        present(navVC, animated: true)
-    }
-    
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell{
-        let cell: UITableViewCell!
-        
-        if let cCell = tableView.dequeueReusableCell(withIdentifier: "cCell"){
-            cell = cCell
-        }else{
-            cell = UITableViewCell()
-        }
-        
-        cell.textLabel?.text = DataBase.shared.info[indexPath.row].fullInfo
-        
-        return cell
     }
     
     @objc func addTapped(){
@@ -99,14 +70,76 @@ class ViewController: UIViewController, UITableViewDataSource, UITableViewDelega
                       print("Incorrect data")
                       return
                   }
-            DataBase.shared.saveContact(name: name1, number: number1)
+            let contact = Contact()
+            contact.name = name1
+            contact.number = number1
+            
+            try! self.realm.write {
+                self.realm.add(contact)
+                    }
+            
             self.tableView.reloadData()
         }))
         
         present(alert, animated: true)
     }
     
-    
-    
+
 }
 
+
+extension ViewController: UITableViewDataSource, UITableViewDelegate{
+    func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
+        return UITableView.automaticDimension
+    }
+    
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        if contacts.count != 0{
+            return contacts.count
+        }
+        return 0
+    }
+    
+    func tableView(_ tableView: UITableView, editingStyleForRowAt indexPath: IndexPath) -> UITableViewCell.EditingStyle {
+        return .delete
+    }
+    
+    func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
+        if editingStyle == .delete {
+            tableView.beginUpdates()
+            let editingContact = contacts[indexPath.row]
+            try! self.realm.write {
+                self.realm.delete(editingContact)
+                   }
+            tableView.deleteRows(at: [indexPath], with: .fade)
+            
+            tableView.endUpdates()
+        }
+    }
+    
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        let rootVC = DetailedVC()
+        let contact = contacts[indexPath.row]
+        let navVC = UINavigationController(rootViewController: rootVC)
+        rootVC.nameField.text = contact.name
+        rootVC.numberField.text = contact.number
+        rootVC.title = contact.name
+        present(navVC, animated: true)
+    }
+    
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell{
+        let cell: UITableViewCell!
+        
+        if let cCell = tableView.dequeueReusableCell(withIdentifier: "cCell"){
+            cell = cCell
+        }else{
+            cell = UITableViewCell()
+        }
+        
+        let contact = contacts[indexPath.row]
+        
+        cell.textLabel?.text = contact.name
+        
+        return cell
+    }
+}
